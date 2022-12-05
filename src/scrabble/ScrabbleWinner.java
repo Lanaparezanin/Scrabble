@@ -567,7 +567,7 @@ public class ScrabbleWinner implements ScrabbleAI {
         }
     }
 
-    /**
+    /**     
      * An Edge in the graph
      * isTerminal is set to FALSE by default!
      */
