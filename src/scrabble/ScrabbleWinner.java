@@ -10,6 +10,8 @@ import java.util.*;
  * Improvement over 'dumb' implementation
  * Run via "ScrabbleTournament.java"
  *
+ * Custom encapsulation in subclasses Move, Tile, DictionaryGraph, and Edge
+ *
  * @author Maxwell S. Freudenburg
  * add your names here
  */
@@ -18,7 +20,6 @@ public class ScrabbleWinner implements ScrabbleAI {
     private Stack<Integer> rows;
     private Stack<Integer> cols;
     private Stack<Location[]> anchors;
-    //private Stack<Guess> guesses;
     private DictGraph dictionary;
     private ArrayList<Move> moves;
     ArrayList<Character> hand;
@@ -111,21 +112,6 @@ public class ScrabbleWinner implements ScrabbleAI {
                         if (!rows.contains(row)) rows.push(row);
                         anchors.push(new Location[]{t.antineighbor(Location.HORIZONTAL), Location.HORIZONTAL});
                     }
-                    /*
-                    // check neighbor below
-                    test = gateKeeper.getSquare(t.neighbor(Location.VERTICAL));
-                    if (test >= 'a' && test <= 'z') {
-                        if (!cols.contains(col)) cols.push(col);
-                        anchors.push(new Location[]{t.neighbor(Location.VERTICAL), Location.VERTICAL});
-                    }
-                    // check neighbor to right
-                    test = gateKeeper.getSquare(t.neighbor(Location.HORIZONTAL));
-                    if (test >= 'a' && test <= 'z') {
-                        if (!rows.contains(row)) rows.push(row);
-                        anchors.push(new Location[]{t.neighbor(Location.HORIZONTAL), Location.HORIZONTAL});
-                    }
-
-                     */
                 }
             }
             log.println();
@@ -138,34 +124,6 @@ public class ScrabbleWinner implements ScrabbleAI {
             log.println("Anchor: " + anchor[0].getRow() + ", " + anchor[0].getColumn());
             findWords(anchor[0], anchor[1]);
         }
-
-        /*
-        for (Tile tile : tiles) {
-            //StdOut.println("Starting On a Tile");
-
-            // dAttack[] is our 'string'
-            char[] dAttack = new char[hand.size()+1];
-            for (int i = 0; i < hand.size(); i++) {
-                dAttack[i] = hand.get(i);
-            }
-            dAttack[hand.size()] = tile.value;
-
-            //StdOut.println("Permutating...");
-            String[] guesses = permutate(dAttack);
-
-            for (int i = 0; i < guesses.length; i++) {
-                //StdOut.println("Trying a guess");
-                String guess = guesses[i];
-                Move hMove = new Move(guess, tile.antineighbor(Location.HORIZONTAL), Location.HORIZONTAL);
-                Move vMove = new Move(guess, tile.antineighbor(Location.VERTICAL), Location.VERTICAL);
-                hMove.score = gateKeeper.score(guess, hMove.location, hMove.direction);
-                vMove.score =gateKeeper.score(guess, vMove.location, vMove.direction);
-                moves.add(hMove);
-                moves.add(vMove);
-                i++;
-            }
-            //StdOut.println("Hey we permutated a tile!");
-        }*/
         return send();
     }
 
@@ -329,106 +287,6 @@ public class ScrabbleWinner implements ScrabbleAI {
         log.println("bestMove SOMEHOW null. Not playing.");
         return new ExchangeTiles(ALL_TILES);
     }
-
-    /*
-    private String[] permutate(char[] dAttack) {
-        //StdOut.println("Permutator Online");
-        //StdOut.println("[" + String.copyValueOf(dAttack) + "]");
-        int length = dAttack.length;
-        //StdOut.println("Factorial Calculated (recursively, of course)!");
-
-        HashSet<Character> characters = new HashSet<>();
-        for (char c : dAttack) {
-            if (characters.contains(c)) continue;
-            characters.add(c);
-        }
-        //StdOut.println(characters.size() + ", " + dAttack.length);
-        int maxPermutations = factorial(dAttack.length)/(2*factorial(dAttack.length - characters.size()));
-        //StdOut.println(maxPermutations);
-
-        // IT IS IN THIS AREA WHERE SOMETHING GOES WRONG SOMETIMES
-
-        HashSet<String> tried = new HashSet<>();
-        Stack<String> words = new Stack<>();
-        Stack<String> tempGuesses = new Stack<>();
-
-        int numPermutations = 0;
-
-        long time = System.nanoTime();
-        int last = 0;
-        while (numPermutations < maxPermutations) {
-            // we'll need to keep track of the "pivot" letter (the 1 letter from the board, plus its location)
-            int oi = (dAttack.length - 1);
-            int j = (int) (Math.random() * oi);
-            if (j == last) continue;
-            last = j;
-            char t = dAttack[j];
-            dAttack[j] = dAttack[oi];
-            dAttack[oi] = t;
-            String perm = new String(dAttack);
-            if (!tried.contains(perm)) {
-                tried.add(perm);
-                numPermutations++;
-                words.push(String.copyValueOf(dAttack));
-                //if (numPermutations%10==0) StdOut.println("[" + numPermutations + " / " + maxPermutations + "]");
-            }
-            if (time - 30000000000L > 0) break;
-        }
-
-        //StdOut.println("Did some permutations");
-
-        HashSet<String> uniqueWords = new HashSet<>();
-
-        int numGuesses = 0;
-        while (!words.isEmpty()) {
-            String word = words.pop();
-            //StdOut.println(word);
-            for (int wordLength = 2; wordLength <= length; wordLength++) {
-                String guess = word.substring(0, wordLength);
-                if (dictionary.contains(guess)) {
-                    if (!uniqueWords.contains(guess)) {
-                        tempGuesses.push(guess);
-                        uniqueWords.add(guess);
-                        numGuesses++;
-                        //StdOut.println("Found a unique valid word!");
-                    }
-                }
-            }
-        }
-
-        String[] guesses = new String[numGuesses];
-        int i = 0;
-        for (String guess : tempGuesses) {
-            //StdOut.println(guess);
-            guesses[i++] = guess;
-        }
-
-        return guesses;
-    }
-
-    static int factorial(int n) {
-        if (n == 0)
-            return 1;
-        else
-            return (n * factorial(n - 1));
-    }
-
-    private class Guess {
-        public Location location;
-        public Location direction;
-        public char[] tiles;
-        public String word;
-
-        //public int letterZero; // 1st index of our Move
-        public Guess(Location location, char[] board) {
-            this.location = location;
-            tiles = new char[15];
-            for (int i = 0; i < board.length; i++) {
-                tiles[i] = board[i];
-            }
-            word = "";
-        }
-    }*/
 
     /**
      * Almost the same as 'Location' class, but contains Location's char
