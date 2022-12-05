@@ -1,8 +1,11 @@
 package scrabble;
 
+import edu.princeton.cs.algs4.LinkedQueue;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.util.ArrayList;
 import java.util.LinkedList;
 
 public class WordFinder {
@@ -67,31 +70,45 @@ public class WordFinder {
         /**
          * If this node has a word in it, adds it to the output, and then tries each permutation of the input.
          */
-        public void getAllWords(char[] input, LinkedList<String> output) {
+        public void getAllWords(ArrayList<char[]> input, int[] letterCount, LinkedList<String> output, int depth) {
             if (this.word != null) { output.add(this.word); }
-            if (input.length > 1) {
-                char[] subInput = new char[input.length - 1];
+            if (depth >= input.size()) { return; }
+
+            char[] charOptions = input.get(depth);
+            //System.out.println(String.valueOf(charOptions));
+
+            if (charOptions.length > 1) {
+                char[] subInput = new char[charOptions.length - 1];
                 for (int i = 0; i < subInput.length; i++) {
-                    subInput[i] = input[i + 1];
+                    subInput[i] = charOptions[i + 1];
                 }
 
                 // stores letters that we've already checked.
                 boolean[] seen = new boolean[26];
 
-                for (int i = 0; i < input.length; i++) {
-                    int charIdx = (int)input[i] - 97;
-                    if (seen[charIdx] != true) {
+                for (int i = 0; i < charOptions.length; i++) {
+
+                    // get numeric index for currently used char
+                    int charIdx = (int)charOptions[i] - 97;
+                    if (seen[charIdx] != true && letterCount[charIdx] > 0) {
+
                         seen[charIdx] = true;
-                        WordNode child = this.getChild(input[i]);
+                        WordNode child = this.getChild(charOptions[i]);
                         if (child != null) {
-                            child.getAllWords(subInput, output);
+                            letterCount[charIdx]--;
+                            child.getAllWords(input, letterCount, output, depth + 1);
+                            letterCount[charIdx]++;
                         }
                     }
-                    if (i < subInput.length) { subInput[i] = input[i]; }
+                    if (i < subInput.length) { subInput[i] = charOptions[i]; }
                 }
             } else {
-                WordNode child = this.getChild(input[0]);
-                if (child != null && child.word != null ) { output.add(child.word); }
+                WordNode child = this.getChild(charOptions[0]);
+                if (child != null && child.word != null ) {
+                    letterCount[(int)charOptions[0] - 97]--;
+                    child.getAllWords(input, letterCount, output, depth + 1);
+                    letterCount[(int)charOptions[0] - 97]++;
+                }
             }
 
         }
@@ -100,13 +117,13 @@ public class WordFinder {
     // END wordnode
 
 
-    public WordFinder() {
-        createWordTree();
-    }
-
+    // START class variables
     private WordNode root = new WordNode();
+    // END class variables
 
-    public void createWordTree() {
+
+    // START constructor
+    public WordFinder() {
         File data = new File("./resources/words.txt");
 
         try {
@@ -120,22 +137,47 @@ public class WordFinder {
             System.out.println("Couldn't find wordlist");
         }
     }
+    // END constructor
 
+
+    // START methods
+
+    /**
+     * Checks if a given string is a valid word
+     */
     public boolean validWord(String word) {
         return this.root.validWord(word, 0);
     }
 
+    /**
+     * Finds all valid words constructable from a given set of letters, with no constraints.
+     * @param hand Set of letters to permute
+     * @param output Output to write to
+     */
     public void getAvailableWords(char[] hand, LinkedList<String> output) {
-        int _count = 0;
-
-        int parseIndex = 0;
-        char[] parsedHand = new char[hand.length];
+        int[] letterCount = new int[26];
         for (int i = 0; i < hand.length; i++) {
-            if (hand[i] == '_') { _count++; } else { parsedHand[parseIndex] = hand[i]; parseIndex++; }
+            int charIdx = (int)hand[i] - 97;
+            letterCount[charIdx]++;
         }
 
-        for (int i = 0; i < _count; i++) { parsedHand[parsedHand.length - 1 - i] = 'e'; }
-        this.root.getAllWords(parsedHand, output);
+        ArrayList<char[]> charOptions = new ArrayList<char[]>();
+        for (int i = 0; i < hand.length; i++) {
+            charOptions.add(hand);
+        }
+
+        this.getAvailableWords(charOptions, letterCount, output);
+    }
+
+    /**
+     * !!!!THIS METHOD CURRENTLY HAS BUGS! USE THE ONE ABOVE FOR NOW!
+     * Finds all valid words given a list of options for each character.
+     * @param charOptions Ordered list of options for each square.
+     * @param letterCount Total times it is allowable to use each letter.
+     * @param output Output list to write to.
+     */
+    public void getAvailableWords(ArrayList<char[]> charOptions, int[] letterCount, LinkedList<String> output) {
+        this.root.getAllWords(charOptions, letterCount, output, 0);
     }
 
     public static void main(String[] args) {
@@ -153,9 +195,26 @@ public class WordFinder {
         //char[] hand = "bcdfghjklmnpqrstvwx".toCharArray();
         //char[] hand = { 'a', 'e', 'i', 'o', 'u', 't', 'r', 'r', 'n', 'r', 'r' };
         //char[] hand = { 'x', 'q', 'g', 'f', 'r', 't', 'k', 'm', 'f', 'r', 'l' };
-        char[] hand = "th__".toCharArray();
-
+        //char[] hand = "th__".toCharArray();
+        char[] hand = "theeer".toCharArray();
         util.getAvailableWords(hand, out);
+
+        ArrayList<char[]> charOptions = new ArrayList<char[]>();
+
+//        charOptions.add("hete".toCharArray());
+//        charOptions.add("hete".toCharArray());
+//        charOptions.add("hete".toCharArray());
+//        charOptions.add("r".toCharArray());
+//        charOptions.add("hete".toCharArray());
+//
+//        int[] letterCount = new int[26];
+//        letterCount[(int)'h' - 97]++;
+//        letterCount[(int)'e' - 97]++;
+//        letterCount[(int)'t' - 97]++;
+//        letterCount[(int)'e' - 97]++;
+//        letterCount[(int)'r' - 97]++;
+//        util.getAvailableWords(charOptions, letterCount, out);
+
         long endTime = System.nanoTime();
 
         for (String word : out) {
