@@ -8,6 +8,7 @@ import java.util.*;
 
 /**
  * Improvement over 'dumb' implementation
+ * Run via "ScrabbleTournament.java"
  *
  * @author Maxwell S. Freudenburg
  * add your names here
@@ -41,23 +42,32 @@ public class ScrabbleWinner implements ScrabbleAI {
         Start();
     }
 
+    /**
+     * ScrabbleTournament calls THIS function to start each move
+     * @return
+     */
     @Override
     public ScrabbleMove chooseMove() {
+        // Update everything
         rows = new Stack<>();
         cols = new Stack<>();
         anchors = new Stack<>();
         hand = gateKeeper.getHand();
         alreadyLoggedWords = new HashSet<>();
 
+        // log hand
         log.println("Hand: " + hand.toString());
 
+        // Do moves - betterFirstMove if first move, else betterMove.
         if (gateKeeper.getSquare(Location.CENTER) == Board.DOUBLE_WORD_SCORE) {
             // INITIALIZATION //
+            Start();
             return betterFirstMove();
         }
         return betterMove();
     }
 
+    // Initialize & populate dictionary. Called once
     private void Start() {
         StdOut.println("START");
         // POPULATE DICTIONARY //
@@ -165,6 +175,7 @@ public class ScrabbleWinner implements ScrabbleAI {
      * Bigger O(n) but smaller n.
      */
     private ScrabbleMove betterFirstMove() {
+        moves = new ArrayList<>();
         findWords(Location.CENTER, Location.VERTICAL);
         findWords(Location.CENTER, Location.HORIZONTAL);
         return send();
@@ -237,16 +248,16 @@ public class ScrabbleWinner implements ScrabbleAI {
             if (!letterFound) return; // return if there's no word to make here
 
             edge = dictionary.getEdge(edge, nextLetter);
-            subWord += "" + "_";
+            subWord += "" + " ";
 
             if (edge.isTerminal) {
-                if (subWord.contains("_") || startLocation.equals(Location.CENTER)) {
+                if (subWord.contains(" ") || startLocation.equals(Location.CENTER)) {
                     Move move = new Move((subWord), startLocation, direction);
                     move.score = gateKeeper.score(move.word, move.location, move.direction);
                     moves.add(move);
                     if (!alreadyLoggedWords.contains(move.word)) {
                         alreadyLoggedWords.add(move.word);
-                        log.printf("Added word\t%-12S", move.word);
+                        log.printf("Added word\t%-12s", move.word);
                         if (move.direction == Location.VERTICAL) log.print("DOWN from ");
                         else log.print("ACROSS from ");
                         log.printf("(%d, %d).\t", move.location.getRow(), move.location.getColumn());
@@ -263,13 +274,13 @@ public class ScrabbleWinner implements ScrabbleAI {
                 //log.print("hand: " + _hand);
                 //_hand.remove(_hand.indexOf(edgeOut.letter));
                 if (edgeOut.isTerminal) {
-                    if (subWord.contains("_") || startLocation.equals(Location.CENTER)) {
+                    if (subWord.contains(" ") || startLocation.equals(Location.CENTER)) {
                         Move move = new Move((subWord + edgeOut.letter), startLocation, direction);
                         move.score = gateKeeper.score(move.word, move.location, move.direction);
                         moves.add(move);
                         if (!alreadyLoggedWords.contains(move.word)) {
                             alreadyLoggedWords.add(move.word);
-                            log.printf("Added word\t%-12S", move.word);
+                            log.printf("Added word\t%-12s", move.word);
                             if (move.direction == Location.VERTICAL) log.print("DOWN from ");
                             else log.print("ACROSS from ");
                             log.printf("(%d, %d).\t", move.location.getRow(), move.location.getColumn());
