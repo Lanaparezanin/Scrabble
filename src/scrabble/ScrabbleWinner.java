@@ -160,6 +160,7 @@ public class ScrabbleWinner implements ScrabbleAI {
     }
 
     /**
+     * STEP 1
      * NEW "move" function
      * Bigger O(n) but smaller n.
      */
@@ -170,8 +171,8 @@ public class ScrabbleWinner implements ScrabbleAI {
     }
 
     /**
+     * STEP 2
      * Called for each "anchor" - or upon "Location.CENTER" if 1st move
-     *
      * @param location spot from which to generate moves
      */
     private void findWords(Location location, Location direction) {
@@ -206,6 +207,7 @@ public class ScrabbleWinner implements ScrabbleAI {
     }
 
     /**
+     * STEP 3
      * Builds a word out starting at startLocation. Adds all found moves to ScrabbleWinner.moves ArrayList.
      *
      * @param subWord       The word so far.
@@ -281,6 +283,12 @@ public class ScrabbleWinner implements ScrabbleAI {
         }
     }
 
+    /**
+     * STEP 4
+     * Sorts all possible moves, looking for highest-scoring legal word.
+     * I'm certain that this one works
+     * @return
+     */
     private ScrabbleMove send() {
         log.println("Starting send()...");
 
@@ -456,10 +464,17 @@ public class ScrabbleWinner implements ScrabbleAI {
         }
     }
 
+    /**
+     * My graph implementation
+     */
     public static class DictGraph {
         private final ArrayList<Edge> edges;
         public Edge root;
 
+        /**
+         * Constructor. Takes filename as string and does the rest
+         * @param filename
+         */
         DictGraph(String filename) {
             edges = new ArrayList<>();
             root = new Edge('\0');
@@ -493,6 +508,12 @@ public class ScrabbleWinner implements ScrabbleAI {
             }
         }
 
+        /**
+         * "Get" the edge from start edge to out edge with char c
+         * @param start leading edge
+         * @param c following edge
+         * @return
+         */
         Edge getEdge(Edge start, char c) {
             for (Edge edge : start.out) {
                 if (edge.letter == c) return edge;
@@ -500,6 +521,13 @@ public class ScrabbleWinner implements ScrabbleAI {
             return null;
         }
 
+        /**
+         * Only used by constructor
+         * @param start
+         * @param c
+         * @param isTerminal
+         * @return
+         */
         Edge addEdge(Edge start, char c, boolean isTerminal) {
             Edge end = new Edge(c);
             if (isTerminal) end.isTerminal = true;
@@ -507,7 +535,7 @@ public class ScrabbleWinner implements ScrabbleAI {
             return end;
         }
 
-        // Test Functions
+        // Test Function
         void printTest(int numWordsToPrint) {
             int i = 0;
             for (Edge edgeOut : root.out) {
@@ -517,6 +545,7 @@ public class ScrabbleWinner implements ScrabbleAI {
             }
         }
 
+        // Test function
         String makeWord(String string, Edge edge) {
             for (Edge edgeOut : edge.out) {
                 string += edgeOut.letter;
