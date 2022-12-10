@@ -5,22 +5,19 @@ import edu.princeton.cs.algs4.Out;
 import edu.princeton.cs.algs4.Queue;
 import edu.princeton.cs.algs4.StdOut;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Stack;
+import java.util.*;
 
 /**
  * Improvement over 'dumb' implementation
  * @author Maxwell S. Freudenburg
  * add your names here
  */
-public class ScrabbleWinner implements ScrabbleAI {
+public class DeepBeige implements ScrabbleAI {
 
     private Stack<Tile> tiles;
     private Stack<Location> anchors;
-    private HashSet<String> dictionary;
     private ArrayList<Move> moves;
+    private WordFinder wordfinder;
 
     /** When exchanging, always exchange everything. */
     private static final boolean[] ALL_TILES = {true, true, true, true, true, true, true};
@@ -49,19 +46,15 @@ public class ScrabbleWinner implements ScrabbleAI {
 
         if (gateKeeper.getSquare(Location.CENTER) == Board.DOUBLE_WORD_SCORE) {
             // INITIALIZATION //
-            Start();
             return betterFirstMove();
         }
         return betterMove();
     }
 
-    private void Start() {
+    public DeepBeige() {
         tiles = new Stack<>();
-        // POPULATE DICTIONARY //
-        // adds all words to dictionary, removing duplicates
-        dictionary = new HashSet<>();
-        In in = new In("words.txt");
-        Collections.addAll(dictionary, in.readAllLines());
+        wordfinder = new WordFinder();
+        moves = new ArrayList<>();
     }
 
     /** NEW "move" function
@@ -72,8 +65,6 @@ public class ScrabbleWinner implements ScrabbleAI {
         //Stack<Location> anchors = new Stack<>();
         PlayWord bestMove = null;
         //int bestScore = -1;
-
-        if (dictionary == null) Start();
 
         StdOut.println("Starting BetterMove");
         moves = new ArrayList<>();
@@ -128,7 +119,9 @@ public class ScrabbleWinner implements ScrabbleAI {
             Move hMove = new Move(guess, Location.CENTER.antineighbor(Location.HORIZONTAL), Location.HORIZONTAL);
             Move vMove = new Move(guess, Location.CENTER.antineighbor(Location.VERTICAL), Location.VERTICAL);
             hMove.score = gateKeeper.score(guess, hMove.location, hMove.direction);
-            vMove.score =gateKeeper.score(guess, vMove.location, vMove.direction);
+            vMove.score = gateKeeper.score(guess, vMove.location, vMove.direction);
+            moves.add(hMove);
+            moves.add(vMove);
             i++;
         }
 
@@ -159,78 +152,13 @@ public class ScrabbleWinner implements ScrabbleAI {
     }
 
     private String[] permutate(char[] dAttack) {
-        //StdOut.println("Permutator Online");
-        //StdOut.println("[" + String.copyValueOf(dAttack) + "]");
-        int length = dAttack.length;
-        //StdOut.println("Factorial Calculated (recursively, of course)!");
+        LinkedList<String> output = new LinkedList<String>();
+        wordfinder.getAvailableWords(dAttack, output);
 
-        HashSet<Character> characters = new HashSet<>();
-        for (char c : dAttack) {
-            if (characters.contains(c)) continue;
-            characters.add(c);
-        }
-        //StdOut.println(characters.size() + ", " + dAttack.length);
-        int maxPermutations = factorial(dAttack.length)/(2*factorial(dAttack.length - characters.size()));
-        //StdOut.println(maxPermutations);
+        String[] ret = new String[output.size()];
+        output.toArray(ret);
 
-        // IT IS IN THIS AREA WHERE SOMETHING GOES WRONG SOMETIMES
-
-        HashSet<String> tried = new HashSet<>();
-        Stack<String> words = new Stack<>();
-        Stack<String> tempGuesses = new Stack<>();
-
-        int numPermutations = 0;
-
-        long time = System.nanoTime();
-        int last = 0;
-        while (numPermutations < maxPermutations) {
-            // we'll need to keep track of the "pivot" letter (the 1 letter from the board, plus its location)
-            int oi = (dAttack.length - 1);
-            int j = (int) (Math.random() * oi);
-            if (j == last) continue;
-            last = j;
-            char t = dAttack[j];
-            dAttack[j] = dAttack[oi];
-            dAttack[oi] = t;
-            String perm = new String(dAttack);
-            if (!tried.contains(perm)) {
-                tried.add(perm);
-                numPermutations++;
-                words.push(String.copyValueOf(dAttack));
-                //if (numPermutations%10==0) StdOut.println("[" + numPermutations + " / " + maxPermutations + "]");
-            }
-            if (time - 30000000000L > 0) break;
-        }
-
-        //StdOut.println("Did some permutations");
-
-        HashSet<String> uniqueWords = new HashSet<>();
-
-        int numGuesses = 0;
-        while (!words.isEmpty()) {
-            String word = words.pop();
-            //StdOut.println(word);
-            for (int wordLength = 2; wordLength <= length; wordLength++) {
-                String guess = word.substring(0, wordLength);
-                if (dictionary.contains(guess)) {
-                    if (!uniqueWords.contains(guess)) {
-                        tempGuesses.push(guess);
-                        uniqueWords.add(guess);
-                        numGuesses++;
-                        //StdOut.println("Found a unique valid word!");
-                    }
-                }
-            }
-        }
-
-        String[] guesses = new String[numGuesses];
-        int i = 0;
-        for (String guess : tempGuesses) {
-            //StdOut.println(guess);
-            guesses[i++] = guess;
-        }
-
-        return guesses;
+        return ret;
     }
 
     /** This is necessary for the first turn, as one-letter words are not allowed. */
