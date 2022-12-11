@@ -12,7 +12,7 @@ public class ScrabbleTournament {
         // List contestants here
         players = new ScrabbleAI[] {
           new Incrementalist(),
-          new Incrementalist()
+          new DeepBeige()
         };
     }
 

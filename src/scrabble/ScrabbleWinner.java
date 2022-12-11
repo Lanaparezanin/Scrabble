@@ -2,51 +2,64 @@ package scrabble;
 
 import edu.princeton.cs.algs4.In;
 import edu.princeton.cs.algs4.Out;
-import edu.princeton.cs.algs4.Queue;
 import edu.princeton.cs.algs4.StdOut;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Stack;
+import java.util.*;
 
 /**
  * Improvement over 'dumb' implementation
+ * Run via "ScrabbleTournament.java"
+ *
+ * Custom encapsulation in subclasses Move, Tile, DictionaryGraph, and Edge
+ *
  * @author Maxwell S. Freudenburg
  * add your names here
  */
 public class ScrabbleWinner implements ScrabbleAI {
 
-    private Stack<Tile> tiles;
-    private Stack<Location> anchors;
-    private HashSet<String> dictionary;
+    private Stack<Integer> rows;
+    private Stack<Integer> cols;
+    private Stack<Location[]> anchors;
+    private DictGraph dictionary;
     private ArrayList<Move> moves;
+    ArrayList<Character> hand;
+    private HashSet<String> alreadyLoggedWords;
 
-    /** When exchanging, always exchange everything. */
+    Out log;
+
+    /**
+     * When exchanging, always exchange everything.
+     */
     private static final boolean[] ALL_TILES = {true, true, true, true, true, true, true};
 
-    /** The GateKeeper through which this Incrementalist-Beating Algo accesses the Board. */
+    /**
+     * The GateKeeper through which this Incrementalist-Beating Algo accesses the Board.
+     */
     private GateKeeper gateKeeper;
 
     @Override
     public void setGateKeeper(GateKeeper gateKeeper) {
         this.gateKeeper = gateKeeper;
+        Start();
     }
 
+    /**
+     * ScrabbleTournament calls THIS function to start each move
+     * @return
+     */
     @Override
     public ScrabbleMove chooseMove() {
-        if (tiles == null) tiles = new Stack<>();
-        // READ BOARD //
-        // here, we add all the 'occupied' locations to a stack
-        Tile t;
-        for (int i = 0; i < Board.WIDTH; i++) {
-            for (int j = 0; j < Board.WIDTH; j++) {
-                t = new Tile(i, j, gateKeeper.getSquare(new Location(i,j)));
-                if (t.value >= 'a' && t.value <= 'z')
-                    tiles.push(t);
-            }
-        }
+        // Update everything
+        rows = new Stack<>();
+        cols = new Stack<>();
+        anchors = new Stack<>();
+        hand = gateKeeper.getHand();
+        alreadyLoggedWords = new HashSet<>();
 
+        // log hand
+        //log.println("Hand: " + hand.toString());
+
+        // Do moves - betterFirstMove if first move, else betterMove.
         if (gateKeeper.getSquare(Location.CENTER) == Board.DOUBLE_WORD_SCORE) {
             // INITIALIZATION //
             Start();
@@ -55,263 +68,224 @@ public class ScrabbleWinner implements ScrabbleAI {
         return betterMove();
     }
 
+    // Initialize & populate dictionary. Called once
     private void Start() {
-        tiles = new Stack<>();
+        //StdOut.println("START");
         // POPULATE DICTIONARY //
-        // adds all words to dictionary, removing duplicates
-        dictionary = new HashSet<>();
-        In in = new In("words.txt");
-        Collections.addAll(dictionary, in.readAllLines());
+        dictionary = new DictGraph("words.txt");
+        log = new Out("log.txt");
     }
 
-    /** NEW "move" function
+    /**
+     * NEW "move" function
      * Bigger O(n) but smaller n.
-     * */
+     */
     private ScrabbleMove betterMove() {
-        ArrayList<Character> hand = gateKeeper.getHand();
-        //Stack<Location> anchors = new Stack<>();
+        //log.println("New Move...");
+
+        // READ BOARD //
+        // here, we add all the 'occupied' locations to a stack
+        Tile t;
+
+        //log.println("\t0 1 2 3 4 5 6 7 8 9 0 1 2 3 4");
+        //log.print("0\t");
+        for (int i = 0; i < Board.WIDTH; i++) //log.print(gateKeeper.getSquare(new Location(0, i)) + " ");
+        //log.println();
+        // find all possible anchors
+        for (int row = 1; row < Board.WIDTH; row++) {
+            //log.print(row + "\t " + gateKeeper.getSquare(new Location(row, 0)));
+            for (int col = 1; col < Board.WIDTH; col++) {
+                t = new Tile(row, col, gateKeeper.getSquare(new Location(row, col)));
+                //log.print(t.value + " ");
+                if (t.value >= 'a' && t.value <= 'z') {
+                    char test;
+
+                    // check neighbor above
+                    test = gateKeeper.getSquare(t.antineighbor(Location.VERTICAL));
+                    if (!(test >= 'a') || !(test <= 'z')) {
+                        if (!cols.contains(col)) cols.push(col);
+                        anchors.push(new Location[]{t.antineighbor(Location.VERTICAL), Location.VERTICAL});
+                    }
+                    // check neighbor to left
+                    test = gateKeeper.getSquare(t.antineighbor(Location.HORIZONTAL));
+                    if (!(test >= 'a') || !(test <= 'z')) {
+                        if (!rows.contains(row)) rows.push(row);
+                        anchors.push(new Location[]{t.antineighbor(Location.HORIZONTAL), Location.HORIZONTAL});
+                    }
+                }
+            }
+            //log.println();
+        }
+
         PlayWord bestMove = null;
-        //int bestScore = -1;
 
-        if (dictionary == null) Start();
-
-        StdOut.println("Starting BetterMove");
         moves = new ArrayList<>();
-
-        /** Find & test words (I'm using Fischer-Yates shuffle)
-         * Add possible moves to 'moves' ArrayList
-         */
-        for (Tile tile : tiles) {
-            //StdOut.println("Starting On a Tile");
-
-            // dAttack[] is our 'string'
-            char[] dAttack = new char[hand.size()+1];
-            for (int i = 0; i < hand.size(); i++) {
-                dAttack[i] = hand.get(i);
-            }
-            dAttack[hand.size()] = tile.value;
-
-            //StdOut.println("Permutating...");
-            String[] guesses = permutate(dAttack);
-
-            for (int i = 0; i < guesses.length; i++) {
-                //StdOut.println("Trying a guess");
-                String guess = guesses[i];
-                Move hMove = new Move(guess, tile.antineighbor(Location.HORIZONTAL), Location.HORIZONTAL);
-                Move vMove = new Move(guess, tile.antineighbor(Location.VERTICAL), Location.VERTICAL);
-                hMove.score = gateKeeper.score(guess, hMove.location, hMove.direction);
-                vMove.score = gateKeeper.score(guess, vMove.location, vMove.direction);
-                moves.add(hMove);
-                moves.add(vMove);
-                i++;
-            }
-            //StdOut.println("Hey we permutated a tile!");
+        for (Location[] anchor : anchors) {
+            //log.println("Anchor: " + anchor[0].getRow() + ", " + anchor[0].getColumn());
+            findWords(anchor[0], anchor[1]);
         }
         return send();
     }
 
-    /** NEW "move" function
+    /**
+     * STEP 1
+     * NEW "move" function
      * Bigger O(n) but smaller n.
-     * */
+     */
     private ScrabbleMove betterFirstMove() {
-        ArrayList<Character> hand = gateKeeper.getHand();
-
-        char[] dAttack = new char[hand.size()];
-        for (int i = 0; i < hand.size(); i++) {
-            dAttack[i] = hand.get(i);
-        }
-
-        String[] guesses = permutate(dAttack);
-
-        for (int i = 0; i < guesses.length; i++){
-            String guess = guesses[i];
-            Move hMove = new Move(guess, Location.CENTER.antineighbor(Location.HORIZONTAL), Location.HORIZONTAL);
-            Move vMove = new Move(guess, Location.CENTER.antineighbor(Location.VERTICAL), Location.VERTICAL);
-            hMove.score = gateKeeper.score(guess, hMove.location, hMove.direction);
-            vMove.score =gateKeeper.score(guess, vMove.location, vMove.direction);
-            i++;
-        }
-
+        moves = new ArrayList<>();
+        findWords(Location.CENTER, Location.VERTICAL);
+        findWords(Location.CENTER, Location.HORIZONTAL);
         return send();
     }
 
+    /**
+     * STEP 2
+     * Called for each "anchor" - or upon "Location.CENTER" if 1st move
+     * @param location spot from which to generate moves
+     */
+    private void findWords(Location location, Location direction) {
+        int row, col;
+        for (int i = -1; i < 7; i++) {
+            if (direction == Location.HORIZONTAL) {
+                row = location.getRow();
+                col = location.getColumn() - i;
+            } else {
+                row = location.getRow() - i;
+                col = location.getColumn();
+            }
+            if (row < 0 || row >= 15 || col < 0 || col >= 15) continue;
+            Location _location = new Location(row, col);
+            char letter1 = gateKeeper.getSquare(_location);
+            if ('a' <= letter1 && letter1 <= 'z') {
+                buildWord("" + letter1,
+                        dictionary.getEdge(dictionary.root, letter1),
+                        _location,
+                        _location,
+                        direction,
+                        hand);
+            } else {
+                buildWord("",
+                        dictionary.root,
+                        _location.neighbor(direction), // "neighbor" to avoid an off-by-1 error
+                        _location,
+                        direction,
+                        hand);
+            }
+        }
+    }
+
+    /**
+     * STEP 3
+     * Builds a word out starting at startLocation. Adds all found moves to ScrabbleWinner.moves ArrayList.
+     *
+     * @param subWord       The word so far.
+     * @param edge          References an edge in our dictionary graph.
+     * @param startLocation We keep track of this for easy Move instantiation
+     * @param location      This is incremented with each (recursive!) call. 1 letter at a time, thus one location at a time
+     * @param direction     Location.HORIZONTAL or Location.VERTICAL. Kind of unwieldy, but OK
+     */
+    private void buildWord(String subWord, Edge edge, Location startLocation, Location location, Location direction, ArrayList<Character> hand) {
+        //ArrayList<Character> _hand = new ArrayList<>(hand);
+
+        if (!location.isOnBoard() || !startLocation.isOnBoard()) return;
+        if (edge.isLeaf) return;
+        char letter, nextLetter;
+
+        location = location.neighbor(direction);
+        if (!location.neighbor(direction).isOnBoard()) return; // return if we've reached the end of the board
+        nextLetter = gateKeeper.getSquare(location);
+
+        if ('a' <= nextLetter && nextLetter <= 'z') {
+            boolean letterFound = false;
+            for (Edge edgeOut : edge.out) {
+                if (edgeOut.letter == nextLetter) {
+                    letterFound = true;
+                }
+            }
+            if (!letterFound) return; // return if there's no word to make here
+
+            edge = dictionary.getEdge(edge, nextLetter);
+            subWord += "" + " ";
+
+            if (edge.isTerminal) {
+                if (subWord.contains(" ") || startLocation.equals(Location.CENTER)) {
+                    Move move = new Move((subWord), startLocation, direction);
+                    move.score = gateKeeper.score(move.word, move.location, move.direction);
+                    moves.add(move);
+//                    if (!alreadyLoggedWords.contains(move.word)) {
+//                        alreadyLoggedWords.add(move.word);
+//                        log.printf("Added word\t%-12s", move.word);
+//                        if (move.direction == Location.VERTICAL) log.print("DOWN from ");
+//                        else log.print("ACROSS from ");
+//                        log.printf("(%d, %d).\t", move.location.getRow(), move.location.getColumn());
+//                        log.println("(hand is " + hand.toString() + ")");
+//                    }
+                }
+                //StdOut.println("Found and added a move! Cause: Matching letter on board was terminal.");
+            }
+            buildWord((subWord), edge, startLocation, location, direction, hand);
+
+        } else {
+            for (Edge edgeOut : edge.out) {
+                if (!hand.contains(edgeOut.letter)) continue;
+                //log.print("hand: " + _hand);
+                //_hand.remove(_hand.indexOf(edgeOut.letter));
+                if (edgeOut.isTerminal) {
+                    if (subWord.contains(" ") || startLocation.equals(Location.CENTER)) {
+                        Move move = new Move((subWord + edgeOut.letter), startLocation, direction);
+                        move.score = gateKeeper.score(move.word, move.location, move.direction);
+                        moves.add(move);
+//                        if (!alreadyLoggedWords.contains(move.word)) {
+//                            alreadyLoggedWords.add(move.word);
+//                            log.printf("Added word\t%-12s", move.word);
+//                            if (move.direction == Location.VERTICAL) log.print("DOWN from ");
+//                            else log.print("ACROSS from ");
+//                            log.printf("(%d, %d).\t", move.location.getRow(), move.location.getColumn());
+//                            log.println("(hand is " + hand + ")");
+//                        }
+                    }
+                    //StdOut.println("Found and added a move! Cause: Letter from generator was terminal.");
+                }
+                buildWord((subWord + edgeOut.letter), edgeOut, startLocation, location, direction, hand);
+            }
+        }
+    }
+
+    /**
+     * STEP 4
+     * Sorts all possible moves, looking for highest-scoring legal word.
+     * I'm certain that this one works
+     * @return
+     */
     private ScrabbleMove send() {
+        //log.println("Starting send()...");
 
         // sort moves in descending order
         Collections.sort(moves);
 
         PlayWord bestMove = null;
-
+        //System.out.printf("ScrabbleWinner: I've found %d moves!\n", moves.size());
+        int logQuota = 0;
         for (Move move : moves) {
             try {
                 gateKeeper.verifyLegality(move.word, move.location, move.direction);
-                bestMove = move.move;
-                System.out.println("Found a move! Score: " + move.score);
+                bestMove = new PlayWord(move.word, move.location, move.direction);
+                //log.println("I CAN PLAY \"" + move.word + "\"! Score: " + move.score);
+                if (bestMove != null) {
+                    //log.println("bestMove not null.");
+                    //log.println("Placing " + move.word + " at (" + move.location.getRow() + ", " + move.location.getColumn() + ")");
+                    return bestMove;
+                }
+                //System.out.println("Found a move! Score: " + move.score);
             } catch (IllegalMoveException e) {
-                // It wasn't legal; go on to the next one
+                //log.println(e);
             }
 
         }
-        if (bestMove != null) {
-            return bestMove;
-        }
+
+        //log.println("bestMove SOMEHOW null. Not playing.");
         return new ExchangeTiles(ALL_TILES);
-    }
-
-    private String[] permutate(char[] dAttack) {
-        //StdOut.println("Permutator Online");
-        //StdOut.println("[" + String.copyValueOf(dAttack) + "]");
-        int length = dAttack.length;
-        //StdOut.println("Factorial Calculated (recursively, of course)!");
-
-        HashSet<Character> characters = new HashSet<>();
-        for (char c : dAttack) {
-            if (characters.contains(c)) continue;
-            characters.add(c);
-        }
-        //StdOut.println(characters.size() + ", " + dAttack.length);
-        int maxPermutations = factorial(dAttack.length)/(2*factorial(dAttack.length - characters.size()));
-        //StdOut.println(maxPermutations);
-
-        // IT IS IN THIS AREA WHERE SOMETHING GOES WRONG SOMETIMES
-
-        HashSet<String> tried = new HashSet<>();
-        Stack<String> words = new Stack<>();
-        Stack<String> tempGuesses = new Stack<>();
-
-        int numPermutations = 0;
-
-        long time = System.nanoTime();
-        int last = 0;
-        while (numPermutations < maxPermutations) {
-            // we'll need to keep track of the "pivot" letter (the 1 letter from the board, plus its location)
-            int oi = (dAttack.length - 1);
-            int j = (int) (Math.random() * oi);
-            if (j == last) continue;
-            last = j;
-            char t = dAttack[j];
-            dAttack[j] = dAttack[oi];
-            dAttack[oi] = t;
-            String perm = new String(dAttack);
-            if (!tried.contains(perm)) {
-                tried.add(perm);
-                numPermutations++;
-                words.push(String.copyValueOf(dAttack));
-                //if (numPermutations%10==0) StdOut.println("[" + numPermutations + " / " + maxPermutations + "]");
-            }
-            if (time - 30000000000L > 0) break;
-        }
-
-        //StdOut.println("Did some permutations");
-
-        HashSet<String> uniqueWords = new HashSet<>();
-
-        int numGuesses = 0;
-        while (!words.isEmpty()) {
-            String word = words.pop();
-            //StdOut.println(word);
-            for (int wordLength = 2; wordLength <= length; wordLength++) {
-                String guess = word.substring(0, wordLength);
-                if (dictionary.contains(guess)) {
-                    if (!uniqueWords.contains(guess)) {
-                        tempGuesses.push(guess);
-                        uniqueWords.add(guess);
-                        numGuesses++;
-                        //StdOut.println("Found a unique valid word!");
-                    }
-                }
-            }
-        }
-
-        String[] guesses = new String[numGuesses];
-        int i = 0;
-        for (String guess : tempGuesses) {
-            //StdOut.println(guess);
-            guesses[i++] = guess;
-        }
-
-        return guesses;
-    }
-
-    /** This is necessary for the first turn, as one-letter words are not allowed. */
-    private ScrabbleMove findTwoTileMove() {
-        ArrayList<Character> hand = gateKeeper.getHand();
-        String bestWord = null;
-        int bestScore = -1;
-        for (int i = 0; i < hand.size(); i++) {
-            for (int j = 0; j < hand.size(); j++) {
-                if (i != j) {
-                    try {
-                        char a = hand.get(i);
-                        if (a == '_') {
-                            a = 'E'; // This could be improved slightly by trying all possibilities for the blank
-                        }
-                        char b = hand.get(j);
-                        if (b == '_') {
-                            b = 'E'; // This could be improved slightly by trying all possibilities for the blank
-                        }
-                        String word = "" + a + b;
-                        gateKeeper.verifyLegality(word, Location.CENTER, Location.HORIZONTAL);
-                        int score = gateKeeper.score(word, Location.CENTER, Location.HORIZONTAL);
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestWord = word;
-                        }
-                    } catch (IllegalMoveException e) {
-                        // It wasn't legal; go on to the next one
-                    }
-                }
-            }
-        }
-        if (bestScore > -1) {
-            return new PlayWord(bestWord, Location.CENTER, Location.HORIZONTAL);
-        }
-        return new ExchangeTiles(ALL_TILES);
-    }
-
-    /**
-     * Technically this tries to make a two-letter word by playing one tile; it won't find words that simply add a
-     * tile to the end of an existing word.
-     */
-    private ScrabbleMove findOneTileMove() {
-        ArrayList<Character> hand = gateKeeper.getHand();
-        PlayWord bestMove = null;
-        int bestScore = -1;
-        for (char c : hand) {
-            if (c == '_') {
-                c = 'E'; // This could be improved slightly by trying all possibilities for the blank
-            }
-            for (String word : new String[]{c + " ", " " + c}) {
-                for (int row = 0; row < Board.WIDTH; row++) {
-                    for (int col = 0; col < Board.WIDTH; col++) {
-                        Location location = new Location(row, col);
-                        for (Location direction : new Location[]{Location.HORIZONTAL, Location.VERTICAL}) {
-                            try {
-                                gateKeeper.verifyLegality(word, location, direction);
-                                int score = gateKeeper.score(word, location, direction);
-                                if (score > bestScore) {
-                                    bestScore = score;
-                                    bestMove = new PlayWord(word, location, direction);
-                                }
-                            } catch (IllegalMoveException e) {
-                                // It wasn't legal; go on to the next one
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (bestMove != null) {
-            return bestMove;
-        }
-        return new ExchangeTiles(ALL_TILES);
-    }
-
-    static int factorial(int n) {
-        if (n == 0)
-            return 1;
-        else
-            return (n * factorial(n - 1));
     }
 
     /**
@@ -321,6 +295,7 @@ public class ScrabbleWinner implements ScrabbleAI {
     private class Tile extends Location {
         // letting 'value' be public, because 'Tile' is private
         public char value;
+
         public Tile(int row, int column, char c) {
             super(row, column);
             value = c;
@@ -355,6 +330,115 @@ public class ScrabbleWinner implements ScrabbleAI {
             } else {
                 return -1;
             }
+        }
+    }
+
+    /**
+     * My graph implementation
+     */
+    public static class DictGraph {
+        private final ArrayList<Edge> edges;
+        public Edge root;
+
+        /**
+         * Constructor. Takes filename as string and does the rest
+         * @param filename
+         */
+        DictGraph(String filename) {
+            edges = new ArrayList<>();
+            root = new Edge('\0');
+            edges.add(root);
+            // Collections.addAll(dictionary, in.readAllLines());
+            In in = new In(filename);
+            for (String word : in.readAllStrings()) {
+                AddWord(word);
+            }
+        }
+
+        /**
+         * Go through each char in word. Link 1st char to Edge "root," and make last char terminal
+         *
+         * @param word word to add to dictionary
+         */
+        void AddWord(String word) {
+            Edge currEdge = null;
+            for (int i = -1; i < word.length(); i++) {
+                int j = i + 1;
+
+                if (i == -1) {
+                    currEdge = addEdge(root, word.charAt(j), false);
+                    edges.add(currEdge);
+                } else if (j == word.length()) {
+                    currEdge.isTerminal = true;
+                } else {
+                    currEdge = addEdge(currEdge, word.charAt(j), false);
+                    edges.add(currEdge);
+                }
+            }
+        }
+
+        /**
+         * "Get" the edge from start edge to out edge with char c
+         * @param start leading edge
+         * @param c following edge
+         * @return
+         */
+        Edge getEdge(Edge start, char c) {
+            for (Edge edge : start.out) {
+                if (edge.letter == c) return edge;
+            }
+            return null;
+        }
+
+        /**
+         * Only used by constructor
+         * @param start
+         * @param c
+         * @param isTerminal
+         * @return
+         */
+        Edge addEdge(Edge start, char c, boolean isTerminal) {
+            Edge end = new Edge(c);
+            if (isTerminal) end.isTerminal = true;
+            start.out.add(end);
+            return end;
+        }
+
+        // Test Function
+        void printTest(int numWordsToPrint) {
+            int i = 0;
+            for (Edge edgeOut : root.out) {
+                if (i >= numWordsToPrint) return;
+                //System.out.println(edgeOut.letter + makeWord("", edgeOut));
+                i++;
+            }
+        }
+
+        // Test function
+        String makeWord(String string, Edge edge) {
+            for (Edge edgeOut : edge.out) {
+                string += edgeOut.letter;
+                if (edgeOut.isTerminal) return string;
+                return makeWord(string, edgeOut);
+            }
+            return null;
+        }
+    }
+
+    /**     
+     * An Edge in the graph
+     * isTerminal is set to FALSE by default!
+     */
+    public static class Edge {
+        public LinkedList<Edge> out;
+        public char letter;
+        public boolean isTerminal;
+        public boolean isLeaf;
+
+        public Edge(char c) {
+            out = new LinkedList<>();
+            letter = c;
+            isTerminal = false;
         }
     }
 

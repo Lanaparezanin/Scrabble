@@ -69,10 +69,15 @@ public class WordFinder {
 
         /**
          * If this node has a word in it, adds it to the output, and then tries each permutation of the input.
+         *
+         * Anchor is a letter in the hand that is required to be in the word.
+         * passedAnchor stores if we have passed the anchor letter and can add this section of the tree to output.
+         * wordVal is a char[] that builds the return values for output.
          */
-        public void getAllWords(char[] hand, char[] fixed, LinkedList<String> output, int depth) {
-            if (this.word != null) { output.add(this.word); }
-            //System.out.println(String.valueOf(charOptions));
+        public void getAllWords(char[] hand, char anchor, ArrayList<String> output, int depth, boolean passedAnchor, char[] wordVal) {
+            if (this.word != null && passedAnchor) {
+                output.add(new String(wordVal, 0, depth));
+            }
 
             if (hand.length > 1) {
                 char[] subInput = new char[hand.length - 1];
@@ -85,24 +90,63 @@ public class WordFinder {
 
                 for (int i = 0; i < hand.length; i++) {
 
-                    // get numeric index for currently used char
-                    int charIdx = (int)hand[i] - 97;
-                    if (seen[charIdx] != true) {
+                    // if tile is wild, check all letters. Wilds are only used after all other letters are exhausted.
+                    if (hand[i] == '_') {
+                        for (char c = 'a'; c < 'z'; c++) {
+                            int charIdx = (int)c - 97;
+                            if (seen[charIdx] != true) {
+                                seen[charIdx] = true;
+                                WordNode child = this.getChild(c);
+                                if (child != null) {
+                                    // using a wild guarantees that this was not the anchor tile
+                                    wordVal[depth] = Character.toUpperCase(c);
+                                    child.getAllWords(subInput, anchor, output, depth + 1, passedAnchor, wordVal);
+                                }
+                            }
+                        }
+                    } else {
+                        // normal behavior
+                        int charIdx = ((int)hand[i]) - 97;
+                        if (seen[charIdx] != true) {
 
-                        seen[charIdx] = true;
-                        WordNode child = this.getChild(hand[i]);
-                        if (child != null) {
-                            child.getAllWords(hand, fixed, output, depth + 1);
+                            seen[charIdx] = true;
+                            WordNode child = this.getChild(hand[i]);
+                            if (child != null) {
+                                boolean passingAnchor = (passedAnchor || hand[i] == anchor);
+                                wordVal[depth] = hand[i];
+                                child.getAllWords(subInput, anchor, output, depth + 1, passingAnchor, wordVal);
+                            }
                         }
                     }
                     if (i < subInput.length) { subInput[i] = hand[i]; }
                 }
+
             } else {
-                WordNode child = this.getChild(hand[0]);
-                if (child != null && child.word != null ) {
-                    output.add(child.word);
+                // hand only has 1 character left.
+
+                // character is wild
+                if (hand[0] == '_') {
+                    // wilds can never be the anchor.
+                    if (passedAnchor) {
+                        for (char c = 'a'; c < 'z'; c++) {
+                            WordNode child = this.getChild(c);
+                            if (child != null && child.word != null) {
+                                wordVal[depth] = Character.toUpperCase(c);
+                                output.add(new String(wordVal, 0, depth));
+                            }
+                        }
+                    }
+                } else {
+                    // character is a normal tile
+                    WordNode child = this.getChild(hand[0]);
+                    boolean passingAnchor = (passedAnchor || hand[0] == anchor);
+                    if (passingAnchor && child != null && child.word != null) {
+                        wordVal[depth] = hand[0];
+                        output.add(new String(wordVal, 0, depth));
+                    }
                 }
             }
+            wordVal[depth] = 0;
 
         }
 
@@ -142,64 +186,60 @@ public class WordFinder {
         return this.root.validWord(word, 0);
     }
 
+
+    private char[] parseHand(char[] hand) {
+        char[] parsedHand = new char[hand.length];
+
+        int foundBlanks = 0;
+        int currentIdx = 0;
+        for (int i = 0; i < hand.length; i++) {
+            if (hand[i] == '_') {
+                foundBlanks++;
+            } else {
+                parsedHand[currentIdx] = hand[i];
+                currentIdx++;
+            }
+        }
+
+        // moves blanks to the end of the hand.
+        for (int i = 0; i < foundBlanks; i++) {
+            parsedHand[parsedHand.length - 1 - i] = '_';
+        }
+
+        return parsedHand;
+    }
+
+
+    public void getAvailableWords(char[] hand, ArrayList<String> output) {
+        this.root.getAllWords(parseHand(hand), '_', output, 0, true, new char[100]);
+    }
+
+
     /**
      * Finds all valid words constructable from a given set of letters, with no constraints.
      * @param hand Set of letters to permute
      * @param output Output to write to
      */
-    public void getAvailableWords(char[] hand, LinkedList<String> output) {
-        int[] letterCount = new int[26];
-        for (int i = 0; i < hand.length; i++) {
-            int charIdx = (int)hand[i] - 97;
-            letterCount[charIdx]++;
-        }
-
-        ArrayList<char[]> charOptions = new ArrayList<char[]>();
-        for (int i = 0; i < hand.length; i++) {
-            charOptions.add(hand);
-        }
-
-        boolean[] fixed = new boolean[charOptions.size()];
-
-        //this.getAvailableWords(charOptions, letterCount, fixed, output);
-    }
-
-    /**
-     * !!!!THIS METHOD CURRENTLY HAS BUGS! USE THE ONE ABOVE FOR NOW!
-     * Finds all valid words given a list of options for each character.
-     * @param output Output list to write to.
-     */
-    public void getAvailableWords(char[] hand, char[] fixed, LinkedList<String> output) {
-        this.root.getAllWords(hand, fixed, output, 0);
+    public void getAvailableWords(char[] hand, char anchor, ArrayList<String> output) {
+        this.root.getAllWords(parseHand(hand), anchor, output, 0, false, new char[100]);
     }
 
     public static void main(String[] args) {
         WordFinder util = new WordFinder();
 
-//        System.out.println(util.validWord("yes"));
-//        System.out.println(util.validWord("zoophytic"));
-//        System.out.println(util.validWord("zygomatic"));
-//        System.out.println(util.validWord("maxilla"));
-//        System.out.println(util.validWord("unquestionably"));
-//        System.out.println(util.validWord("sdigbakjd"));
-
-        long startTime = System.nanoTime();
-        LinkedList<String> out = new LinkedList<String>();
-        //char[] hand = "bcdfghjklmnpqrstvwx".toCharArray();
-        //char[] hand = { 'a', 'e', 'i', 'o', 'u', 't', 'r', 'r', 'n', 'r', 'r' };
-        //char[] hand = { 'x', 'q', 'g', 'f', 'r', 't', 'k', 'm', 'f', 'r', 'l' };
-        //char[] hand = "th__".toCharArray();
-        char[] hand = "aieepthr".toCharArray();
+        long startTime = System.currentTimeMillis();
+        ArrayList<String> out = new ArrayList<String>();
+        char[] hand = "peeem__t".toCharArray();
         char[] fixed = new char[hand.length];
-        util.getAvailableWords(hand, fixed, out);
+        util.getAvailableWords(hand, 't', out);
 
-        long endTime = System.nanoTime();
+        long endTime = System.currentTimeMillis();
 
         for (String word : out) {
             System.out.println(word);
         }
 
-        System.out.println("Search took " + ((double)(endTime - startTime) / 1000000.0) + "s");
+        System.out.println("Search took " + (endTime - startTime) + "ms");
         System.out.println("Search found " + out.size() + " words");
     }
 

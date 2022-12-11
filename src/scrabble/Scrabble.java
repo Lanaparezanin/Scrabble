@@ -102,7 +102,8 @@ public class Scrabble {
     public Scrabble() {
         board = new Board();
         //ai = new Incrementalist(); // Opponent
-        ai = new ScrabbleWinner();
+        //ai = new ScrabbleWinner();
+        ai = new DeepBeige();
         ai.setGateKeeper(new GateKeeper(board, 0));
         mode = Mode.AI_PLAYING;
     }
