@@ -14,10 +14,12 @@ import static java.awt.event.KeyEvent.*;
 /** GUI allowing a human to play against a ScrabbleAI. To change the AI, edit the constructor. */
 public class ScrabbleAIArena {
 
-    private static final ScrabbleAI aiA = new DeepBeige();
+    private static final ScrabbleAI aiA = new CheapBeige();
     //private static final ScrabbleAI aiB = new DeepBeige();
     //private static final ScrabbleAI aiB = new Incrementalist();
-    private static final ScrabbleAI aiB = new ScrabbleWinner();
+    //private static final ScrabbleAI aiB = new ScrabbleWinner();
+    //private static final ScrabbleAI aiB = new CheapBeige();
+    private static final ScrabbleAI aiB = new SleepBeige();
 
     private static final Map<Character, Color> COLORS = new HashMap<>();
 

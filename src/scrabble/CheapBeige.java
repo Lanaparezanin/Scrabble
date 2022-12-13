@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Stack;
 
-public class DeepBeige implements ScrabbleAI {
+public class CheapBeige implements ScrabbleAI {
 
     /**
      * When exchanging, always exchange everything.
@@ -14,42 +14,15 @@ public class DeepBeige implements ScrabbleAI {
 
     private GateKeeper gateKeeper;
     private WordFinder wordFinder;
-    private PossiBoard currentBoard;
 
     private final boolean DEBUG = false;
-
-    private static int[] FULL_BAG = new int[27];
-    private static final int TOTAL_TILES = "aaaaaaaaabbccddddeeeeeeeeeeeeffggghhiiiiiiiiijkllllmmnnnnnnooooooooppqrrrrrrssssttttttuuuuvvwwxyyz__".length();
-
-    static {
-        char[] bagChars = "aaaaaaaaabbccddddeeeeeeeeeeeeffggghhiiiiiiiiijkllllmmnnnnnnooooooooppqrrrrrrssssttttttuuuuvvwwxyyz__".toCharArray();
-        for (int i = 0; i < bagChars.length; i++) {
-            if (bagChars[i] == '_') {
-                FULL_BAG[26]++;
-            } else {
-                int charIdx = ((int)bagChars[i]) - 97;
-                FULL_BAG[charIdx]++;
-            }
-        }
-    }
 
 
     // END local vars, START constructor
 
 
-    public DeepBeige() {
+    public CheapBeige() {
         wordFinder = new WordFinder();
-        currentBoard = new PossiBoard();
-
-        testHand.add('a');
-        testHand.add('e');
-        testHand.add('i');
-        testHand.add('o');
-        testHand.add('u');
-        testHand.add('r');
-        testHand.add('t');
-        testHand.add('s');
-        testHand.add('l');
     }
 
 
@@ -75,7 +48,7 @@ public class DeepBeige implements ScrabbleAI {
 
         @Override
         public int compareTo(Object o) {
-            DeepBeige.Move other = (DeepBeige.Move) o;
+            CheapBeige.Move other = (CheapBeige.Move) o;
             // this is actually BACKWARDS, as we want the list of moves to be in DESCENDING order.
             if (this.score < other.score) {
                 return 1;
@@ -115,139 +88,19 @@ public class DeepBeige implements ScrabbleAI {
         if (gateKeeper.getSquare(Location.CENTER) == Board.DOUBLE_WORD_SCORE) {
             move = getFirstMove();
         } else {
-            move = searchBestMove();
-//            ArrayList<Character> _hand = this.gateKeeper.getHand();
-//            char[][] boardLayout = new char[Board.WIDTH][Board.WIDTH];
-//            move = getTopScoreMove(_hand, gateKeeper, boardLayout);
-//            currentBoard = new PossiBoard(boardLayout, move, true);
-//            System.out.println(currentBoard.value);
+            ArrayList<Character> _hand = this.gateKeeper.getHand();
+            move = getTopScoreMove(_hand, this.gateKeeper);
         }
         return move;
     }
 
-    private static ArrayList<Character> testHand = new ArrayList<>();
-
-
-    private ScrabbleMove searchBestMove() {
-
-        int unknownTiles = TOTAL_TILES;
-        int[] knownBag = new int[27];
-        for (int i = 0; i < knownBag.length; i++) {
-            knownBag[i] = FULL_BAG[i];
-        }
-        ArrayList<Character> _hand = this.gateKeeper.getHand();
-        for (Character c : _hand) {
-            if (Character.isAlphabetic(c)) {
-                if (Character.isUpperCase(c)) {
-                    knownBag[26]--;
-                    unknownTiles--;
-                } else {
-                    int charIdx = ((int)c) - 97;
-                    knownBag[charIdx]--;
-                    unknownTiles--;
-                }
-            }
-        }
-
-        LinkedList<ScrabbleMove> legalMoves =  getAllMoves(_hand, this.gateKeeper);
-        // get current board
-        char[][] boardLayout = new char[Board.WIDTH][Board.WIDTH];
-        for (int row = 0; row < Board.WIDTH; row++) {
-            for (int col = 0; col < Board.WIDTH; col++) {
-                char c = this.gateKeeper.getSquare(new Location(row, col));
-                boardLayout[row][col] = c;
-                if (Character.isAlphabetic(c)) {
-                    if (Character.isUpperCase(c)) {
-                        knownBag[26]--;
-                        unknownTiles--;
-                    } else {
-                        int charIdx = ((int)c) - 97;
-                        knownBag[charIdx]--;
-                        unknownTiles--;
-                    }
-                }
-            }
-            //System.out.println("");
-        }
-
-        ArrayList<Character> opponent_hand = new ArrayList<Character>();
-        if (unknownTiles <= 14) {
-            // deep copy the known bag so we have a probabilistic one to pull from
-            int[] probabilisticBag = new int[27];
-            for (int i = 0; i < knownBag.length; i++) {
-                probabilisticBag[i] = knownBag[i];
-            }
-
-            // find the 7 most common letters
-            boolean tilesRemain = true;
-            for (int i = 0; i < 6; i++) {
-                int maxIndex = 0;
-                for (int j = 1; j < probabilisticBag.length; j++) {
-                    if (probabilisticBag[maxIndex] < probabilisticBag[j]) {
-                        maxIndex = j;
-                    }
-                }
-
-                if (knownBag[maxIndex] > 0) {
-                    if (maxIndex == 26) {
-                        opponent_hand.add('_');
-                    } else {
-                        opponent_hand.add((char) (maxIndex + 97));
-                        knownBag[maxIndex]--;
-                    }
-                } else {
-                    tilesRemain = false;
-                    break;
-                }
-                probabilisticBag[maxIndex] -= 5;
-            }
-        } else {
-            opponent_hand = testHand;
-        }
-
-        int maxScore = -10000;
-        ScrabbleMove bestMove = new ExchangeTiles(ALL_TILES);
-
-        System.out.println("Guessing opponent's hand is: ");
-        for (char c : opponent_hand) {
-            System.out.print(c + " ");
-        }
-        System.out.println("");
-
-        //System.out.println("Searching " + legalMoves.size() + " moves");
-        for (ScrabbleMove move : legalMoves) {
-            PossiBoard p = new PossiBoard(boardLayout, move, true);
-            //System.out.println(p.toString());
-            if (boardValue(p, false, opponent_hand, 0) > maxScore) {
-                maxScore = p.value;
-                bestMove = move;
-                //System.out.println("new best:" + p.value);
-            }
-        }
-
-        return bestMove;
-    }
-
-    // player true if it's us
-    private int boardValue(PossiBoard board, boolean player, ArrayList<Character> hand, int depth) {
-        if (depth >= 1) { return board.value; }
-
-        // gatekeeper's player doesn't matter.
-        LinkedList<ScrabbleMove> legalMoves = getAllMoves(hand, new GateKeeper(board, 0));
-        int maxScore = -10000;
-        for (ScrabbleMove move : legalMoves) {
-            PossiBoard p = new PossiBoard(board, move, player);
-            if (boardValue(p, !player, hand,depth + 1) > maxScore) { maxScore = p.value; }
-        }
-
-        return maxScore;
-    }
-
 
     /**
-     * Gets a list of available moves, sorted by score.
+     * Given a hand and a board, returns the highest-scoring move.
+     * @return
      */
-    private LinkedList<ScrabbleMove> getAllMoves(ArrayList<Character> _hand, GateKeeper gateKeeper) {
+    private ScrabbleMove getTopScoreMove(ArrayList<Character> _hand, GateKeeper gateKeeper) {
+
         long startTime;
         if (DEBUG) {startTime = System.currentTimeMillis();}
 
@@ -278,7 +131,9 @@ public class DeepBeige implements ScrabbleAI {
 
         // initialize storage for highest-scoring move
         int maxScore = -1;
-        LinkedList<ScrabbleMove> moves = new LinkedList<ScrabbleMove>();
+        String word = "";
+        LocationPlus playLocation = new LocationPlus(7, 7);
+        Location playRotation = Location.HORIZONTAL;
 
         while (!possibleMoves.empty()) {
             LocationPlus location = possibleMoves.pop();
@@ -313,10 +168,10 @@ public class DeepBeige implements ScrabbleAI {
                 try {
                     gateKeeper.verifyLegality(_word, hLocation, Location.HORIZONTAL);
                     int score = gateKeeper.score(_word, hLocation, Location.HORIZONTAL);
-                    //if (maxScore < score) {
-                    if (true) {
-                        //System.out.println("added " + _word);
-                        moves.add(new PlayWord(_word, hLocation, Location.HORIZONTAL));
+                    if (maxScore < score) {
+                        word = _word;
+                        playLocation = new LocationPlus(hLocation.x, hLocation.y);
+                        playRotation = Location.HORIZONTAL;
                         maxScore = score;
                     }
                 } catch (Exception e) {
@@ -328,10 +183,10 @@ public class DeepBeige implements ScrabbleAI {
                 try {
                     gateKeeper.verifyLegality(_word, vLocation, Location.VERTICAL);
                     int score = gateKeeper.score(_word, vLocation, Location.VERTICAL);
-                    //if (maxScore < score) {
-                    if (true) {
-                        //System.out.println("added " + _word);
-                        moves.add(new PlayWord(_word, vLocation, Location.VERTICAL));
+                    if (maxScore < score) {
+                        word = _word;
+                        playLocation = new LocationPlus(vLocation.x, vLocation.y);
+                        playRotation = Location.VERTICAL;
                         maxScore = score;
                     }
                 } catch (Exception e) {
@@ -341,7 +196,24 @@ public class DeepBeige implements ScrabbleAI {
             }
         }
 
-        return moves;
+        ScrabbleMove out;
+
+        if (DEBUG) {
+            long endTime = System.currentTimeMillis();
+            System.out.println("Move took " + (endTime - startTime) + "ms");
+            System.out.println("Hand was " + String.valueOf(_hand));
+        }
+
+        if (word.length() == 0) {
+            if (DEBUG) {System.out.println("exchanged hand");}
+            out = new ExchangeTiles(ALL_TILES);
+        } else {
+            if (DEBUG) {System.out.println("Scored " + maxScore + " by playing " + word + " at " + playLocation.x + ", " + playLocation.y);}
+            return new PlayWord(word, playLocation, playRotation);
+        }
+
+        return out;
+
     }
 
 
